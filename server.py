@@ -10,11 +10,15 @@ from django import dispatch
 from django.core.urlresolvers import resolve, Resolver404
 
 # Connect a handler to the "received" signal that will handle pingback
-# requests made to your server. The signal provides the following arguments:
+# requests made to your server. The signal provides the following keyword
+# arguments:
 #
 # - sender: a Django HttpRequest instance of a request handling the pingback
 # - source_url: a URL that links to your server URL
 # - target_url: a URL being linked to by the page at source_url
+# - view: resolved view function for target_url
+# - args: arguments for the view function
+# - kwargs: keyword arguments for the view
 # - author: the page author's name guessed from the source page HTML
 # - excerpt: an excerpt from the text surrounding the link in the source page
 #   HTML
@@ -23,7 +27,7 @@ from django.core.urlresolvers import resolve, Resolver404
 # URLs. This guarantees that they are both exist, that target_url belongs to
 # this server and that source_url indeed is linking here.
 
-received = dispatch.Signal(providing_args=['source_url', 'target_url', 'author', 'excerpt'])
+received = dispatch.Signal(providing_args=['source_url', 'target_url', 'view', 'args', 'kwargs', 'author', 'excerpt'])
 
 CONTAINERS = [
     'body', 'section', 'nav', 'article', 'aside',
@@ -80,8 +84,7 @@ def parse_data(source_url, target_url):
         author = title and text(title) or unicode(source_url)
     return author, excerpt
 
-def _handle_pingback(request, root, args):
-    source_url, target_url = args
+def _handle_pingback(request, root, source_url, target_url):
     schema, host, path, query, fragment = urlsplit(target_url)
     if host != request.get_host() or not path.startswith(root):
         raise Exception('Target URL is not under "%s://%s%s"' % (
@@ -90,13 +93,17 @@ def _handle_pingback(request, root, args):
             root,
         ))
     try:
-        resolve(path)
+        urlconf = getattr(request, 'urlconf', None)
+        view, args, kwargs = resolve(path, urlconf)
     except Resolver404:
         raise Exception('Target URL not found on server')
     author, excerpt = parse_data(source_url, target_url)
     received.send(request,
         source_url = source_url,
         target_url = target_url,
+        view = view,
+        args = args,
+        kwargs = kwargs,
         author = author,
         excerpt = excerpt,
     )
@@ -122,7 +129,7 @@ def server_view(request, root='/'):
         args, method = xmlrpclib.loads(request.raw_post_data)
         if method != 'pingback.ping':
             raise Exception('Unknown method "%s"' % method)
-        _handle_pingback(request, root, args)
+        _handle_pingback(request, root, *args)
         result = xmlrpclib.dumps((None,), methodresponse=True, allow_none=True)
     except Exception, e:
         fault = xmlrpclib.Fault(1, str(e))
