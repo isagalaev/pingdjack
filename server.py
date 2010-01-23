@@ -49,7 +49,7 @@ def parse_data(source_url, target_url):
     content_type = f.info().getheader('content-type', 'text/html')
     value, params = cgi.parse_header(content_type)
     charset = params.get('charset', 'utf-8').replace("'", '')
-    doc = HTMLParser().parse(f.read.decode(charset))
+    doc = HTMLParser().parse(f.read().decode(charset))
     for node in doc:
         if node.name == u'a' and node.attributes.get('href') == target_url:
             link = node
