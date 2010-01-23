@@ -1,0 +1,124 @@
+## WHAT'S THIS
+
+Pingdjack is a library for sites made with Django that implements server and
+client parts of [Pingback protocol][1]. One of the interesting features of
+the library is smart use of semantics of HTML to discover links, parse source
+text excerpt and name of the author.
+
+[1]: http://hixie.ch/specs/pingback/pingback-1.0
+
+
+## INSTALLATION
+
+Install it anywhere under Python path and you're set. Since it's purely a
+library it doesn't even have to be listed under `INSTALLED_APPS` in your
+settings.
+
+To work correctly Pingdjack requires [html5lib][2].
+
+[2]: http://code.google.com/p/html5lib/
+
+
+## USAGE
+
+
+### Making pings (client part)
+
+The simplest way to ping external links upon publishing your blog post (or a
+forum topic or any other publication) is:
+
+    import pingdjack
+
+    pingdjack.ping_external_urls(source_url, html, root_url)
+
+.. where:
+
+- `source_url` is the URL of your post
+- `html` is the actual HTML contents of the post
+- `root_url` defines a root URL outside of which links are considered external
+
+When pinging all external links pingdjack won't stop on any HTTP or Pingback
+errors that may occur and will try to ping all of them.
+
+For more fine-grained control of the process you can find two lower level
+functions:
+
+- `external_urls` returns a list of external URLs in an HTML fragment
+- `ping` performs a pingback call from a source URL to a target URL; it does
+  break on all errors and it's your responsibility to handle them
+
+
+### Accepting pings (server part)
+
+To accept pings you should include a view `server_view` in your urlconf under
+any URL you like:
+
+    import pingdjack
+
+    urlpatterns = patterns('',
+        # ...
+        url(r'^blog/pingback/$', pingdjack.server_view, name='pingback'),
+    )
+
+And advertise it in your base template (or in HTTP headers) accoring to the
+spec:
+
+    <link rel="pingback" href="http://{{ host }}{% url pingback %}">
+
+(Note that Pingback requires an URL to be absolute, i.e. include a schema and
+a hostname.)
+
+The view does all the hard work by handling XML-RPC conversation, parsing
+source URL, making sure that it indeed links to your target URL and tries to
+guess a sensible text excerpt containing the link and the name of the author of
+the source page.
+
+If everything goes well the view then sends a signal `received` to which you
+connect a function that will actually do something useful with a pingback:
+store it for statistics, make a special kind of comment from it or whatever.
+
+The signal comes with a set of arguments:
+
+- `sender`: a Django HttpRequest instance of a request handling the pingback
+- `source_url`: a URL that links to your server URL
+- `target_url`: a URL being linked to by the page at source_url
+- `view`: resolved view function for target_url
+- `args`: arguments for the view function
+- `kwargs`: keyword arguments for the view
+- `author`: the page author's name guessed from the source page HTML
+- `excerpt`: an excerpt from the text surrounding the link in the source page
+  HTML
+
+An example showing interpretating of pingbacks as comments for a blog post:
+
+    import pingdjack
+
+    def handle_pingback(sender, source_url, view, args, author, excerpt, **kwargs):
+
+        # check if ping goes to blog's post view, not some other part
+        # raise appropriate exception otherwise
+        if view != show_post:
+            raise pingdjack.UnpingableTarget
+
+        # find a post
+        post = Post.objects.get(slug=args[0])
+
+        # check if we're already seen this pingback
+        if post.comment_set.filter(type='pingback', url=source_url):
+            raise pingdjack.DuplicatePing
+
+        # create a comment
+        post.comment_set.create(
+            type = 'pingback',
+            text = excerpt,
+            author = author,
+            url = source_url,
+        )
+
+    # connect the handler to the `received` signal
+    pingdjack.received.connect(handle_pingback)
+
+(Note that Pingback doesn't explicitly require checking for duplicate pings
+but it's really good idea to do this because duplicate pings happen in practice
+from time to time and your software is in much better position than any pinging
+server to know if it was pinged already.)
