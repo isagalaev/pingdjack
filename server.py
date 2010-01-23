@@ -10,6 +10,8 @@ from django.views.decorators.http import require_POST
 from django import dispatch
 from django.core.urlresolvers import resolve, Resolver404
 
+import errors
+
 # Connect a handler to the "received" signal that will handle pingback
 # requests made to your server. The signal provides the following keyword
 # arguments:
@@ -55,7 +57,7 @@ def parse_data(source_url, target_url):
             link = node
             break
     else:
-        raise Exception('Target URL is not found under source URL')
+        raise errors.TargetNotFoundUnderSource
 
     def text(node):
         result = u''.join(s.value for s in node if s.type == 4)
@@ -92,7 +94,7 @@ def parse_data(source_url, target_url):
 def _handle_pingback(request, root, source_url, target_url):
     schema, host, path, query, fragment = urlsplit(target_url)
     if host != request.get_host() or not path.startswith(root):
-        raise Exception('Target URL is not under "%s://%s%s"' % (
+        raise errors.UnpingableTarget('Target URL is not under "%s://%s%s"' % (
             request.is_secure() and 'https' or 'http',
             request.get_host(),
             root,
@@ -101,7 +103,7 @@ def _handle_pingback(request, root, source_url, target_url):
         urlconf = getattr(request, 'urlconf', None)
         view, args, kwargs = resolve(path, urlconf)
     except Resolver404:
-        raise Exception('Target URL not found on server')
+        raise errors.TargetDoesNotExist
     author, excerpt = parse_data(source_url, target_url)
     received.send(request,
         source_url = source_url,
@@ -133,10 +135,11 @@ def server_view(request, root='/'):
     try:
         args, method = xmlrpclib.loads(request.raw_post_data)
         if method != 'pingback.ping':
-            raise Exception('Unknown method "%s"' % method)
+            raise errors.Error('Unknown method "%s"' % method)
         _handle_pingback(request, root, *args)
-        result = xmlrpclib.dumps((None,), methodresponse=True, allow_none=True)
-    except Exception, e:
-        fault = xmlrpclib.Fault(1, str(e))
+        result = xmlrpclib.dumps(('OK',), methodresponse=True)
+    except xmlrpclib.Fault, fault:
         result = xmlrpclib.dumps(fault)
+    except Exception, e:
+        result = xmlrpclib.dumps(errors.Error(str(e)))
     return http.HttpResponse(result)
