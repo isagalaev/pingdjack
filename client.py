@@ -36,19 +36,16 @@ def ping(source_url, target_url):
         match = re.search(r'<link rel="pingback" href="([^"]+)" ?/?>', content)
         return match and match.group(1)
 
+    f = urlopen(target_url)
     try:
-        f = urlopen(target_url)
-        try:
-            info = f.info()
-            server_url = info.get('X-Pingback', '') or \
-                                      search_link(f.read(512 * 1024))
-            if server_url:
-                server = xmlrpclib.ServerProxy(server_url)
-                server.pingback.ping(source_url, target_url)
-        finally:
-            f.close()
-    except (IOError, xmlrpclib.Error, ExpatError):
-        raise
+        info = f.info()
+        server_url = info.get('X-Pingback', '') or \
+                                  search_link(f.read(512 * 1024))
+        if server_url:
+            server = xmlrpclib.ServerProxy(server_url)
+            server.pingback.ping(source_url, target_url)
+    finally:
+        f.close()
 
 def ping_external_urls(source_url, html, root_url):
     '''
@@ -58,4 +55,8 @@ def ping_external_urls(source_url, html, root_url):
     root_url defines a root outside of which links are considered external.
     '''
     for url in external_urls(html, root_url):
-        ping(source_url, url)
+        try:
+            ping(source_url, url)
+        except (IOError, xmlrpclib.Error, ExpatError):
+            # One failed URL shouldn't block others
+            pass
