@@ -2,6 +2,7 @@
 from urllib2 import urlopen
 from urlparse import urlsplit
 import xmlrpclib
+import cgi
 
 from html5lib import HTMLParser
 from django import http
