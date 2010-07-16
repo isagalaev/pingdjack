@@ -18,7 +18,7 @@ def external_urls(html, root_url):
 
     def is_external(url):
         schema, host, path, query, fragment = urlsplit(url)
-        return host != '' and \
+        return schema in ('', 'http', 'https') and host != '' and \
                (host != root_host or not path.startswith(root_path))
 
     doc = HTMLParser().parseFragment(html)
@@ -36,7 +36,8 @@ def ping(source_url, target_url):
         match = re.search(r'<link rel="pingback" href="([^"]+)" ?/?>', content)
         return match and match.group(1)
 
-    f = urlopen(target_url)
+    request_url = 'http:%s' % target_url if target_url.startswith('//') else target_url
+    f = urlopen(request_url)
     try:
         info = f.info()
         server_url = info.get('X-Pingback', '') or \
