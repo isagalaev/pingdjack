@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
-from urllib2 import urlopen
-from urlparse import urlsplit
-import xmlrpclib
+from urllib.request import urlopen
+from urllib.parse import urlsplit
+import xmlrpc.client
 import cgi
 
 from html5lib import HTMLParser
@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 from django import dispatch
 from django.core.urlresolvers import resolve, Resolver404
 
-import errors
+from . import errors
 
 # Connect a handler to the "received" signal that will handle pingback
 # requests made to your server. The signal provides the following keyword
@@ -53,15 +53,15 @@ def parse_data(source_url, target_url):
     charset = params.get('charset', 'utf-8').replace("'", '')
     doc = HTMLParser().parse(f.read().decode(charset))
     for node in doc:
-        if node.name == u'a' and node.attributes.get('href') == target_url:
+        if node.name == 'a' and node.attributes.get('href') == target_url:
             link = node
             break
     else:
         raise errors.TargetNotFoundUnderSource
 
     def text(node):
-        result = u''.join(s.value for s in node if s.type == 4)
-        return result.replace(u'\n', u' ').strip()
+        result = ''.join(s.value for s in node if s.type == 4)
+        return result.replace('\n', ' ').strip()
 
     def find(node, name, exclude):
         childNodes = (n for n in node.childNodes if n != exclude)
@@ -88,7 +88,7 @@ def parse_data(source_url, target_url):
         container, node = container.parent, container
     else:
         title = find(doc, 'title', None)
-        author = title and text(title) or unicode(source_url)
+        author = title and text(title) or source_url
     return author, excerpt
 
 def _handle_pingback(request, root, source_url, target_url):
@@ -133,13 +133,13 @@ def server_view(request, root='/'):
     consider incoming target URLs as its own.
     '''
     try:
-        args, method = xmlrpclib.loads(request.raw_post_data)
+        args, method = xmlrpc.client.loads(request.raw_post_data)
         if method != 'pingback.ping':
             raise errors.Error('Unknown method "%s"' % method)
         _handle_pingback(request, root, *args)
-        result = xmlrpclib.dumps(('OK',), methodresponse=True)
-    except xmlrpclib.Fault, fault:
-        result = xmlrpclib.dumps(fault)
-    except Exception, e:
-        result = xmlrpclib.dumps(errors.Error(str(e)))
+        result = xmlrpc.client.dumps(('OK',), methodresponse=True)
+    except xmlrpc.client.Fault as fault:
+        result = xmlrpc.client.dumps(fault)
+    except Exception as e:
+        result = xmlrpc.client.dumps(errors.Error(str(e)))
     return http.HttpResponse(result)
