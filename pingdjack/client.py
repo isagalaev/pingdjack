@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 import xmlrpc.client
 from xml.parsers.expat import ExpatError
 
-from html5lib import HTMLParser
+import html5lib
 
 def external_urls(html, root_url):
     '''
@@ -21,8 +21,10 @@ def external_urls(html, root_url):
         return schema in ('', 'http', 'https') and host != '' and \
                (host != root_host or not path.startswith(root_path))
 
-    doc = HTMLParser().parseFragment(html)
-    urls = (n.attributes.get('href', '') for n in doc if n.name == 'a')
+    doc = html5lib.parse(html)
+    walker = html5lib.treewalkers.getTreeWalker('etree')(doc)
+    links = (n for n in walker if n['type'] == 'StartTag' and n['name'] == 'a')
+    urls = (n['data'].get((None, 'href'), '') for n in links)
     return (u.encode('utf-8') for u in urls if is_external(u))
 
 def ping(source_url, target_url):
