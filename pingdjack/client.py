@@ -1,8 +1,14 @@
 # -*- coding:utf-8 -*-
 import re
-from urllib.request import urlopen
-from urllib.parse import urlsplit
-import xmlrpc.client
+try:
+    from urllib.request import urlopen
+    from urllib.parse import urlsplit
+except ImportError:
+    from urllib import urlopen
+try:
+    from xmlrpc.client import ServerProxy, Error
+except ImportError:
+    from xmlrpclib import ServerProxy, Error
 from xml.parsers.expat import ExpatError
 
 import html5lib
@@ -45,7 +51,7 @@ def ping(source_url, target_url):
         server_url = info.get('X-Pingback', '') or \
                                   search_link(f.read(512 * 1024))
         if server_url:
-            server = xmlrpc.client.ServerProxy(server_url)
+            server = ServerProxy(server_url)
             server.pingback.ping(source_url, target_url)
     finally:
         f.close()

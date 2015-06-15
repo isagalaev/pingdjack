@@ -1,7 +1,13 @@
 # -*- coding:utf-8 -*-
-from urllib.request import urlopen
-from urllib.parse import urlsplit
-import xmlrpc.client
+try:
+    from urllib.request import urlopen
+    from urllib.parse import urlsplit
+except ImportError:
+    from urllib import urlopen
+try:
+    from xmlrpc.client import Fault, loads, dumps
+except ImportError:
+    from xmlrpclib import Fault, loads, dumps
 import cgi
 
 from html5lib import HTMLParser
@@ -133,13 +139,13 @@ def server_view(request, root='/'):
     consider incoming target URLs as its own.
     '''
     try:
-        args, method = xmlrpc.client.loads(request.raw_post_data)
+        args, method = loads(request.raw_post_data)
         if method != 'pingback.ping':
             raise errors.Error('Unknown method "%s"' % method)
         _handle_pingback(request, root, *args)
-        result = xmlrpc.client.dumps(('OK',), methodresponse=True)
-    except xmlrpc.client.Fault as fault:
-        result = xmlrpc.client.dumps(fault)
+        result = dumps(('OK',), methodresponse=True)
+    except Fault as fault:
+        result = dumps(fault)
     except Exception as e:
-        result = xmlrpc.client.dumps(errors.Error(str(e)))
+        result = dumps(errors.Error(str(e)))
     return http.HttpResponse(result)
