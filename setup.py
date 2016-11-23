@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='pingdjack',
-    version='0.1',
+    version='0.3',
     packages=[
         'pingdjack',
     ],
