@@ -1,15 +1,7 @@
-# -*- coding:utf-8 -*-
 import re
-try:
-    from urllib.request import urlopen
-    from urllib.parse import urlsplit
-except ImportError:
-    from urllib import urlopen
-    from urlparse import urlsplit
-try:
-    from xmlrpc.client import ServerProxy, Error
-except ImportError:
-    from xmlrpclib import ServerProxy, Error
+from urllib.request import urlopen
+from urllib.parse import urlsplit
+from xmlrpc.client import ServerProxy, Error
 from xml.parsers.expat import ExpatError
 
 import html5lib
@@ -33,7 +25,7 @@ def external_urls(html, root_url):
     walker = html5lib.treewalkers.getTreeWalker('etree')(doc)
     links = (n for n in walker if n['type'] == 'StartTag' and n['name'] == 'a')
     urls = (n['data'].get((None, 'href'), '') for n in links)
-    return (u.encode('utf-8') for u in urls if is_external(u))
+    return (u for u in urls if is_external(u))
 
 
 def ping(source_url, target_url):
@@ -43,16 +35,16 @@ def ping(source_url, target_url):
     linking to you".
     '''
 
-    def search_link(content):
-        match = re.search(r'<link rel="pingback" href="([^"]+)" ?/?>', content)
-        return match and match.group(1)
+    def search_link(f):
+        content = f.read(512 * 1024)
+        match = re.search(rb'<link rel="pingback" href="([^"]+)" ?/?>', content)
+        return match and match.group(1).decode('utf-8')
 
     request_url = 'http:%s' % target_url if target_url.startswith('//') else target_url
     f = urlopen(request_url)
     try:
         info = f.info()
-        server_url = info.get('X-Pingback', '') or \
-            search_link(f.read(512 * 1024))
+        server_url = info.get('X-Pingback', '') or search_link(f)
         if server_url:
             server = ServerProxy(server_url)
             server.pingback.ping(source_url, target_url)
