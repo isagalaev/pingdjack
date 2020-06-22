@@ -14,7 +14,7 @@ from html5lib import HTMLParser
 from django import http
 from django.views.decorators.http import require_POST
 from django import dispatch
-from django.core.urlresolvers import resolve, Resolver404
+from django.urls import resolve, Resolver404
 
 from . import errors
 
