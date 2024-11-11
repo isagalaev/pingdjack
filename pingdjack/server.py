@@ -36,7 +36,7 @@ from . import errors
 # URLs. This guarantees that they are both exist, that target_url belongs to
 # this server and that source_url indeed is linking here.
 
-received = dispatch.Signal(providing_args=['source_url', 'target_url', 'view', 'args', 'kwargs', 'author', 'excerpt'])
+received = dispatch.Signal()
 
 CONTAINERS = [
     'body', 'section', 'nav', 'article', 'aside',
