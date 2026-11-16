@@ -14,6 +14,7 @@ setup(
     url='https://github.com/isagalaev/pingdjack/',
     install_requires = [
         'html5lib',
+        'mimeparse',
         'django',
     ]
 )

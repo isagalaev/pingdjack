@@ -8,9 +8,9 @@ try:
     from xmlrpc.client import Fault, loads, dumps
 except ImportError:
     from xmlrpclib import Fault, loads, dumps
-import cgi
 
 from html5lib import HTMLParser
+import mimeparse
 from django import http
 from django.views.decorators.http import require_POST
 from django import dispatch
@@ -55,7 +55,7 @@ def parse_data(source_url, target_url):
     '''
     f = urlopen(source_url)
     content_type = f.info().getheader('content-type', 'text/html')
-    value, params = cgi.parse_header(content_type)
+    maintype, subtype, params = mimeparse.parse_mime_type(content_type)
     charset = params.get('charset', 'utf-8').replace("'", '')
     doc = HTMLParser().parse(f.read().decode(charset))
     for node in doc:
